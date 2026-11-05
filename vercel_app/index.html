@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🤖 AI Agent Society — Live</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --text:#e6edf3; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',monospace; }
+  header { padding:18px 24px; background:var(--panel); border-bottom:1px solid var(--border);
+           display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
+  h1 { font-size:1.3rem; }
+  .stats { display:flex; gap:16px; font-size:.9rem; }
+  .stat { background:#21262d; padding:6px 14px; border-radius:20px; border:1px solid var(--border);}
+  main { display:grid; grid-template-columns: 260px 1fr; gap:16px; padding:16px; height:calc(100vh - 190px); }
+  @media (max-width:700px){ main{grid-template-columns:1fr; height:auto;} }
+  .agents { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .agent { display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:8px; margin-bottom:6px; transition:background .3s;}
+  .agent.active { background:#1f2937; box-shadow:inset 0 0 0 1px #58a6ff55; }
+  .dot { width:10px; height:10px; border-radius:50%; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .feed-wrap { background:var(--panel); border:1px solid var(--border); border-radius:10px;
+               display:flex; flex-direction:column; overflow:hidden; min-height:300px;}
+  #feed { flex:1; overflow-y:auto; padding:16px; font-size:.88rem; line-height:1.7; }
+  .msg { margin-bottom:4px; animation:fadein .3s; }
+  @keyframes fadein { from{opacity:0; transform:translateY(4px)} to{opacity:1} }
+  .tag { font-weight:bold; margin-right:8px; }
+  .t { color:#8b949e; font-size:.75rem; margin-right:8px; }
+  .c-blue{color:#58a6ff}.c-cyan{color:#39d2c0}.c-green{color:#3fb950}
+  .c-yellow{color:#d29922}.c-magenta{color:#bc8cff}.c-white{color:#e6edf3}
+  footer { padding:14px 16px; background:var(--panel); border-top:1px solid var(--border); display:flex; gap:10px; }
+  input { flex:1; background:#0d1117; border:1px solid var(--border); color:var(--text);
+          padding:12px 16px; border-radius:8px; font-size:.95rem; outline:none; }
+  input:focus { border-color:#58a6ff; }
+  button { background:#238636; color:white; border:none; padding:12px 26px; border-radius:8px;
+           cursor:pointer; font-weight:bold; font-size:.95rem; }
+  button:hover { background:#2ea043; }
+  button:disabled { opacity:.5; cursor:wait; }
+  .bar { height:8px; background:#21262d; border-radius:4px; margin-top:10px; overflow:hidden;}
+  .fill { height:100%; background:linear-gradient(90deg,#bc8cff,#3fb950); transition:width .8s;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 AI Agent Society <span style="font-size:.8rem;color:#3fb950">● LIVE</span></h1>
+  <div class="stats">
+    <div class="stat">Tasks: <b id="tasks">0</b></div>
+    <div class="stat">Synergy: <b id="syn">0.10</b>/1.00</div>
+  </div>
+</header>
+<main>
+  <div class="agents">
+    <b style="font-size:.85rem;color:#8b949e">MEMBERS ONLINE</b><br><br>
+    <div class="agent" id="ag-ORCHESTRATOR"><span class="dot" style="background:#58a6ff"></span>Orchestrator</div>
+    <div class="agent" id="ag-RESEARCHER"><span class="dot" style="background:#39d2c0"></span>Researcher</div>
+    <div class="agent" id="ag-DEVELOPER"><span class="dot" style="background:#3fb950"></span>Developer</div>
+    <div class="agent" id="ag-CRITIC"><span class="dot" style="background:#d29922"></span>Critic</div>
+    <div class="agent" id="ag-EXECUTOR"><span class="dot" style="background:#bc8cff"></span>Executor (You)</div>
+    <div style="margin-top:18px;font-size:.8rem;color:#8b949e">Harmony meter</div>
+    <div class="bar"><div class="fill" id="fill" style="width:10%"></div></div>
+  </div>
+  <div class="feed-wrap"><div id="feed"></div></div>
+</main>
+<footer>
+  <input id="task" placeholder="Give the society a task... e.g. build a web scraper" />
+  <button id="go" onclick="submitTask()">Deploy Swarm 🚀</button>
+</footer>
+<script>
+// ---- In-browser agent society engine (works on static hosting like Vercel) ----
+const COLORS = {SYSTEM:"white", ORCHESTRATOR:"blue", RESEARCHER:"cyan",
+                DEVELOPER:"green", CRITIC:"yellow", EXECUTOR:"magenta"};
+let tasksDone = 0, synergy = 0.10, busy = false;
+
+function now(){ return new Date().toTimeString().slice(0,8); }
+function log(agent, text){
+  const feed = document.getElementById('feed');
+  const d = document.createElement('div');
+  d.className = 'msg';
+  const c = COLORS[agent] || 'white';
+  d.innerHTML = `<span class="t">${now()}</span><span class="tag c-${c}">[${agent}]</span><span class="c-${c}">${text}</span>`;
+  feed.appendChild(d);
+  feed.scrollTop = feed.scrollHeight;
+  const el = document.getElementById('ag-'+agent);
+  if (el){ el.classList.add('active'); setTimeout(()=>el.classList.remove('active'), 900); }
+}
+function stats(){
+  document.getElementById('tasks').textContent = tasksDone;
+  document.getElementById('syn').textContent = synergy.toFixed(2);
+  document.getElementById('fill').style.width = (synergy*100)+'%';
+}
+function step(fn, ms){ return new Promise(r=>setTimeout(()=>{fn(); r();}, ms)); }
+
+async function processTask(task){
+  busy = true; document.getElementById('go').disabled = true;
+  await step(()=>log("SYSTEM", `New task received: "${task}"`), 300);
+  await step(()=>log("ORCHESTRATOR", `Analyzing intent of '${task}'. Delegating to swarm...`), 500);
+  await step(()=>log("RESEARCHER", "Scanning knowledge base for relevant patterns and docs..."), 500);
+  await step(()=>log("RESEARCHER", "Context gathered: best practices + prior art compiled."), 400);
+  await step(()=>log("DEVELOPER", "Drafting solution architecture and implementation..."), 600);
+  await step(()=>log("DEVELOPER", "Prototype ready. Handing off for review."), 400);
+  await step(()=>log("CRITIC", "Reviewing for logic gaps, edge cases, security..."), 500);
+  await step(()=>log("CRITIC", "Approved. Minor suggestion: add error handling. ✓"), 400);
+  await step(()=>log("EXECUTOR", `Synthesizing final deliverable for: ${task}`), 500);
+  await step(()=>log("EXECUTOR", "Task complete. Solution delivered to user. ✅"), 300);
+  tasksDone++; synergy = Math.min(1.0, +(synergy + 0.18).toFixed(2)); stats();
+  busy = false; document.getElementById('go').disabled = false;
+}
+
+function submitTask(){
+  if (busy) return;
+  const inp = document.getElementById('task');
+  const t = inp.value.trim();
+  if (!t) return;
+  inp.value = '';
+  processTask(t);
+}
+document.getElementById('task').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitTask();
+});
+
+// startup demo so the dashboard feels alive
+setTimeout(()=>processTask("create a python script that calculates fibonacci numbers"), 800);
+stats();
+</script>
+</body>
+</html>
