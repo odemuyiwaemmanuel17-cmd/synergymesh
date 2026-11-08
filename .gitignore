@@ -1,8 +1,2 @@
-node_modules/
-__pycache__/
-*.pyc
-*.log
-node_modules/
-package-lock.json
-.vercel/
-.DS_Store
+*.zip
+*.bundle
