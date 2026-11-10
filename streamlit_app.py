@@ -7,6 +7,7 @@ Run locally:   streamlit run streamlit_app.py
 Deploy free:   https://share.streamlit.io  (push this file + requirements.txt to GitHub)
 """
 
+import os
 import time
 import random
 from datetime import datetime
@@ -20,6 +21,21 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Pin a light theme explicitly — prevents the "black page" symptom when the
+# viewer's OS forces dark mode but custom inline colors assume a light canvas.
+try:
+    st.context.configure(
+        theme={
+            "base": "light",
+            "primaryColor": "#4C7DF0",
+            "backgroundColor": "#FFFFFF",
+            "secondaryBackgroundColor": "#F1F5F9",
+            "textColor": "#0F172A",
+        }
+    )
+except Exception:
+    pass  # older Streamlit versions without st.context — safe to skip
 
 AGENTS = {
     "orchestrator": {"name": "Orchestrator", "emoji": "🔵", "color": "#4C7DF0",
@@ -71,18 +87,15 @@ PHASES = [
 
 def run_task(task: str):
     """The five bodies collaborate on a task, streaming messages live."""
-    st.session_state.busy = "orchestrator"
+    st.session_state.busy = None  # avoid auto-rerun loop during this pass
     header = f"── NEW TASK: “{task}” ──"
     emit("user", "orchestrator", header, kind="task")
 
     for sender, receiver, line in PHASES:
-        st.session_state.busy = sender
-        # each render of the loop below is driven by the caller; here we just log
         verb = random.choice(["refined", "validated", "stress-tested", "optimized"])
         emit(sender, receiver, f"{line}  ·  {verb} against edge cases",
              kind="phase")
 
-    st.session_state.busy = None
     st.session_state.tasks_done += 1
     emit("orchestrator", "user",
          f"🏁 Task complete. Synergy across all 5 bodies: "
@@ -152,10 +165,13 @@ with tab_agents:
     for col, (aid, a) in zip(cols, AGENTS.items()):
         with col:
             active = st.session_state.busy == aid
-            with st.border(True) if hasattr(st, "border") else st.container(border=True):
+            with st.container(border=True):
                 st.markdown(f"### {a['emoji']} {a['name']}")
-                st.badge("ACTIVE 🟠" if active else "IDLE 🟢",
-                         color="orange" if active else "green")
+                try:
+                    st.badge("ACTIVE 🟠" if active else "IDLE 🟢",
+                             color="orange" if active else "green")
+                except Exception:
+                    st.markdown("**ACTIVE 🟠**" if active else "**IDLE 🟢**")
                 st.caption(a["role"])
 
 with tab_about:
