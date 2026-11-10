@@ -1,29 +1,27 @@
 """
-🤝 AI AGENT SOCIETY — Streamlit Edition
-Five autonomous agents working in perfect harmony:
-Orchestrator 🔵 · Researcher 🩵 · Developer 🟢 · Critic 🟡 · Executor 🟣
+🤝 SYNERGYMESH — AI Agent Society
+A five-body agent society (Orchestrator 🔵 · Researcher 🩵 · Developer 🟢 ·
+Critic 🟡 · Executor 🟣) with a full user interface AND a chat interface.
 
-Run locally:   streamlit run streamlit_app.py
-Deploy free:   https://share.streamlit.io  (push this file + requirements.txt to GitHub)
+Run locally:  streamlit run streamlit_app.py
+Deploy free:  https://share.streamlit.io
 """
 
-import os
 import time
-import random
 from datetime import datetime
 
 import streamlit as st
 
+from society_engine import AGENTS, run_society, synergy_for
+
 # ---------------------------------------------------------------- page setup
 st.set_page_config(
-    page_title="AI Agent Society",
+    page_title="SynergyMesh — AI Agent Society",
     page_icon="🤝",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Pin a light theme explicitly — prevents the "black page" symptom when the
-# viewer's OS forces dark mode but custom inline colors assume a light canvas.
 try:
     st.context.configure(
         theme={
@@ -35,162 +33,154 @@ try:
         }
     )
 except Exception:
-    pass  # older Streamlit versions without st.context — safe to skip
+    pass
 
-AGENTS = {
-    "orchestrator": {"name": "Orchestrator", "emoji": "🔵", "color": "#4C7DF0",
-                     "role": "Coordinates the swarm, routes tasks, resolves conflicts"},
-    "researcher":   {"name": "Researcher",   "emoji": "🩵", "color": "#38BDF8",
-                     "role": "Gathers knowledge, scans docs, finds best practices"},
-    "developer":    {"name": "Developer",    "emoji": "🟢", "color": "#22C55E",
-                     "role": "Writes code, designs architecture, implements solutions"},
-    "critic":       {"name": "Critic",       "emoji": "🟡", "color": "#EAB308",
-                     "role": "Reviews quality, catches bugs, enforces standards"},
-    "executor":     {"name": "Executor",     "emoji": "🟣", "color": "#A855F7",
-                     "role": "Synthesizes deliverables and ships the final result"},
-}
+st.markdown(
+    """
+    <style>
+    .block-container {padding-top: 1.2rem;}
+    div[data-testid="stChatMessage"] {border-radius: 12px; padding: .4rem .6rem;}
+    .agent-badge {display:inline-block;padding:2px 10px;border-radius:999px;
+                  color:#fff;font-size:.8rem;font-weight:600;margin-right:6px;}
+    .stTabs [data-baseweb="tab-list"] {gap: 6px;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-# ------------------------------------------------------------- state helpers
-def init_state():
-    if "feed" not in st.session_state:
-        st.session_state.feed = []          # list of message dicts
-        st.session_state.synergy = 0.0
-        st.session_state.tasks_done = 0
-        st.session_state.busy = None        # agent id currently active
-        st.session_state.task_log = {}      # task -> list of messages
-
-
-init_state()
+# ---------------------------------------------------------------- session state
+defaults = dict(
+    chat=[],          # [{"role": "user"/"agent", "agent": key|None, "content": str}]
+    feed=[],          # [{"time": str, "agent": key, "text": str}]
+    tasks_done=0,
+    busy=False,
+)
+for k, v in defaults.items():
+    st.session_state.setdefault(k, v)
 
 
-def emit(sender, receiver, text, kind="msg"):
-    """One agent speaks to another — appended to the shared society feed."""
-    msg = {
-        "t": datetime.now().strftime("%H:%M:%S"),
-        "sender": sender, "receiver": receiver, "text": text, "kind": kind,
-    }
-    st.session_state.feed.append(msg)
-    if st.session_state.feed:
-        st.session_state.synergy = min(1.0, st.session_state.synergy + 0.04)
-    return msg
+def now() -> str:
+    return datetime.now().strftime("%H:%M:%S")
 
 
-PHASES = [
-    ("orchestrator", "researcher", "📥 Task received → dispatching research sweep"),
-    ("researcher", "developer", "🔎 Best practices & references compiled for dev team"),
-    ("developer", "critic", "⌨️ Implementation drafted → requesting review"),
-    ("critic", "developer", "🔍 Review passed with minor suggestions (approved)"),
-    ("developer", "executor", "✅ Revised build handed off for delivery"),
-    ("executor", "orchestrator", "🚀 Final deliverable shipped to requester"),
-]
+def push_feed(agent_key: str, text: str):
+    st.session_state.feed.append({"time": now(), "agent": agent_key, "text": text})
 
 
-def run_task(task: str):
-    """The five bodies collaborate on a task, streaming messages live."""
-    st.session_state.busy = None  # avoid auto-rerun loop during this pass
-    header = f"── NEW TASK: “{task}” ──"
-    emit("user", "orchestrator", header, kind="task")
+# ---------------------------------------------------------------- header + metrics
+st.markdown("## 🤝 SynergyMesh — AI Agent Society")
+st.caption("Five bodies. One mind. Perfect harmony.")
 
-    for sender, receiver, line in PHASES:
-        verb = random.choice(["refined", "validated", "stress-tested", "optimized"])
-        emit(sender, receiver, f"{line}  ·  {verb} against edge cases",
-             kind="phase")
+m1, m2, m3 = st.columns([1, 1, 2])
+tasks = st.session_state.tasks_done
+synergy = synergy_for(tasks)
+m1.metric("Tasks Completed", tasks)
+m2.metric("Messages Exchanged", len(st.session_state.feed))
+m3.metric("Harmony / Synergy", f"{synergy:.2f} / 1.00")
+st.progress(min(synergy, 1.0),
+            text="PERFECT HARMONY ✨" if synergy >= 0.95 else "Collaborative resonance")
 
-    st.session_state.tasks_done += 1
-    emit("orchestrator", "user",
-         f"🏁 Task complete. Synergy across all 5 bodies: "
-         f"{st.session_state.synergy:.2f}/1.00", kind="done")
-
-
-# ---------------------------------------------------------------- sidebar
+# ---------------------------------------------------------------- sidebar roster
 with st.sidebar:
-    st.markdown("## 🤝 AI Agent Society")
-    st.caption("Five bodies · one mind · perfect harmony")
+    st.header("👥 The Five Bodies")
+    for key, a in AGENTS.items():
+        st.markdown(
+            f'<span class="agent-badge" style="background:{a["color"]}">'
+            f'{a["emoji"]} {a["name"]}</span>&nbsp;<small>{a["role"]}</small>',
+            unsafe_allow_html=True,
+        )
+        st.write("")
     st.divider()
-    task = st.text_input("💬 Give the swarm a task",
-                         placeholder="e.g. build a REST API with auth…")
-    deploy = st.button("🚀 Deploy Swarm", use_container_width=True, type="primary")
-    st.divider()
-    st.markdown("### 👥 Members")
-    for a in AGENTS.values():
-        dot = "🟢 online" if st.session_state.busy != a["name"].lower() else "🟠 active"
-        st.markdown(f"**{a['emoji']} {a['name']}**  \n<a style='color:{a['color']}'>{dot}</a> · {a['role']}",
-                    unsafe_allow_html=True)
-        st.caption("")
-    st.divider()
-    if st.button("🧹 Clear feed"):
-        st.session_state.feed = []
-        st.session_state.synergy = 0.0
-        st.session_state.tasks_done = 0
+    if st.button("🧹 Reset society", use_container_width=True):
+        for k, v in defaults.items():
+            st.session_state[k] = [] if isinstance(v, list) else 0 if isinstance(v, int) else v
         st.rerun()
 
-if deploy and task.strip():
-    run_task(task.strip())
-    st.rerun()
+# ---------------------------------------------------------------- tabs
+tab_chat, tab_feed, tab_about = st.tabs(["💬 Chat with the Society", "📡 Live Message Feed", "ℹ️ How it works"])
 
-# ---------------------------------------------------------------- main layout
-c1, c2, c3 = st.columns([2, 1, 1])
-with c1:
-    st.markdown(f"# 🤝 AI Agent Society <span style='font-size:0.6em'>● LIVE</span>",
-                unsafe_allow_html=True)
-with c2:
-    st.metric("Tasks Completed", st.session_state.tasks_done)
-with c3:
-    st.metric("Harmony / Synergy", f"{st.session_state.synergy:.2f} / 1.00")
-
-st.progress(st.session_state.synergy,
-            text=f"Swarm synergy — {'PERFECT HARMONY ✨' if st.session_state.synergy >= 0.95 else 'collaborating…'}")
-
-tab_feed, tab_agents, tab_about = st.tabs(["📡 Live Message Feed", "👥 The Five Bodies", "ℹ️ How they harmonize"])
-
-with tab_feed:
-    if not st.session_state.feed:
-        st.info("The society is idle. Type a task in the sidebar and hit **🚀 Deploy Swarm** to watch all five agents collaborate in real time.")
-    else:
-        feed_box = st.container(height=520)
-        with feed_box:
-            for m in reversed(st.session_state.feed[-60:]):
-                s = AGENTS.get(m["sender"], {"emoji": "🧑", "name": "User", "color": "#94A3B8"})
-                r = AGENTS.get(m["receiver"], {"emoji": "🧑", "name": "User", "color": "#94A3B8"})
+# ============================================================== CHAT INTERFACE
+with tab_chat:
+    # render history
+    for msg in st.session_state.chat:
+        if msg["role"] == "user":
+            with st.chat_message("user"):
+                st.write(msg["content"])
+        else:
+            a = AGENTS[msg["agent"]]
+            with st.chat_message("assistant", avatar=a["emoji"]):
                 st.markdown(
-                    f"<div style='padding:6px 10px;border-left:3px solid {s['color']};margin-bottom:6px;background:#0f172a22;border-radius:6px'>"
-                    f"<b style='color:{s['color']}'>{s['emoji']} {s['name']}</b> "
-                    f"<span style='opacity:.5'>→</span> "
-                    f"<b style='color:{r['color']}'>{r['emoji']} {r['name']}</b> "
-                    f"<span style='opacity:.4;font-size:.8em'>{m['t']}</span><br/>{m['text']}</div>",
-                    unsafe_allow_html=True)
+                    f'**<span class="agent-badge" style="background:{a["color"]}">'
+                    f'{a["name"]}</span>**  \n{msg["content"]}',
+                    unsafe_allow_html=True,
+                )
 
-with tab_agents:
-    cols = st.columns(5)
-    for col, (aid, a) in zip(cols, AGENTS.items()):
-        with col:
-            active = st.session_state.busy == aid
-            with st.container(border=True):
-                st.markdown(f"### {a['emoji']} {a['name']}")
-                try:
-                    st.badge("ACTIVE 🟠" if active else "IDLE 🟢",
-                             color="orange" if active else "green")
-                except Exception:
-                    st.markdown("**ACTIVE 🟠**" if active else "**IDLE 🟢**")
-                st.caption(a["role"])
+    if st.session_state.busy:
+        with st.spinner("The swarm is collaborating on your request…"):
+            task = st.session_state.chat[-1]["content"]
+            events = list(run_society(task, seed=tasks))
+            time.sleep(0.05)
 
+            # record everything, then release the lock and rerun cleanly
+            for ev in events:
+                push_feed(ev["agent"], ev["text"])
+            st.session_state.chat.append(
+                {"role": "agent", "agent": "executor", "content": events[-1]["text"]}
+            )
+            st.session_state.tasks_done += 1
+            st.session_state.busy = False
+            st.rerun()
+
+    # quick-suggestion chips
+    c1, c2, c3, c4 = st.columns(4)
+    suggestions = {
+        c1: "Build a REST API for a todo app",
+        c2: "Research the best vector database",
+        c3: "Review my authentication flow",
+        c4: "Create a fibonacci script",
+    }
+    picked = None
+    for col, s in suggestions.items():
+        if col.button(f"💡 {s}", use_container_width=True, key=f"sug_{s}"):
+            picked = s
+
+    prompt = st.chat_input("Ask the society anything, or give it a mission…")
+    user_msg = prompt or picked
+
+    if user_msg:
+        st.session_state.chat.append({"role": "user", "agent": None, "content": user_msg})
+        st.session_state.busy = True
+        st.rerun()
+
+# ============================================================== LIVE FEED
+with tab_feed:
+    st.subheader("📡 Inter-agent message stream")
+    if not st.session_state.feed:
+        st.info("No messages yet — send the society a mission in the 💬 Chat tab.")
+    else:
+        for row in reversed(st.session_state.feed[-200:]):
+            a = AGENTS[row["agent"]]
+            st.markdown(
+                f'<code style="color:#64748B">{row["time"]}</code>&nbsp;'
+                f'<span class="agent-badge" style="background:{a["color"]}">'
+                f'{a["emoji"]} {a["name"]}</span>&nbsp;{row["text"]}',
+                unsafe_allow_html=True,
+            )
+
+# ============================================================== ABOUT
 with tab_about:
-    st.markdown("""
-**The collaboration protocol (each task runs all 5 phases):**
+    st.subheader("🎼 The collaboration protocol")
+    st.markdown(
+        """
+        | Phase | Body | Contribution |
+        |-------|------|--------------|
+        | 1 · Dispatch | 🔵 Orchestrator | Parses your request, routes to the right lead specialist |
+        | 2 · Discovery | 🩵 Researcher | Gathers context, docs and best practices |
+        | 3 · Build | 🟢 Developer | Implements the solution with tests & error handling |
+        | 4 · Review | 🟡 Critic | Audits quality; can bounce work back for revisions |
+        | 5 · Ship | 🟣 Executor | Synthesizes and delivers the final artifact |
 
-| Phase | From → To | What happens |
-|---|---|---|
-| 1. Dispatch | 🔵 Orchestrator → 🩵 Researcher | Parses intent, assigns specialists |
-| 2. Discovery | 🩵 Researcher → 🟢 Developer | Delivers docs, patterns, constraints |
-| 3. Build | 🟢 Developer → 🟡 Critic | Submits draft implementation for review |
-| 4. Review | 🟡 Critic → 🟢 Developer | Feedback loop until quality bar is met |
-| 5. Ship | 🟣 Executor → 🔵 Orchestrator | Synthesizes and delivers the final artifact |
-
-Every exchange raises the **synergy score**. The Critic's feedback loop back to the
-Developer guarantees no task ships unreviewed — that closed loop *is* the harmony.
-""")
-
-# ---------------------------------------------------------------- auto-refresh
-if st.session_state.busy:
-    time.sleep(0.8)
-    st.rerun()
+        Every mission passes through all five bodies — that's what keeps the
+        **harmony score** climbing. Ask follow-ups in the chat and the swarm iterates.
+        """
+    )
